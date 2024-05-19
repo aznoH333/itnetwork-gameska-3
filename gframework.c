@@ -2,7 +2,7 @@
 #define G_FRAMEWORK
 
 #include "raylib.h"
-
+#include <math.h>
 //------------------------------------------------------
 // Conf
 //------------------------------------------------------
@@ -42,6 +42,15 @@ int min(int a, int b){
     return b;
 }
 
+float sign(float input){
+	if (input == 0){
+		return 0;
+	}else if (input > 0){
+		return 1;
+	}
+	return -1;
+}
+
 //------------------------------------------------------
 // sprites
 //------------------------------------------------------
@@ -58,7 +67,7 @@ FrameworkSpriteSheet initSpriteSheet(){
 	FrameworkSpriteSheet out;
 	out.spriteSheetTexture = LoadTexture("resources/spritesheet.png");
 	out.width = out.spriteSheetTexture.width / DEFAULT_SPRITE_SIZE;
-	out.height = out.spriteSheetTexture.height / DEFAULT_SPRITE_SIZE + 1;
+	out.height = out.spriteSheetTexture.height / DEFAULT_SPRITE_SIZE;
 	
 	return out;
 }
@@ -66,6 +75,8 @@ FrameworkSpriteSheet initSpriteSheet(){
 void unloadSpriteSheet(FrameworkSpriteSheet spriteSheet){
 	UnloadTexture(spriteSheet.spriteSheetTexture);
 }
+
+
 
 
 //------------------------------------------------------
@@ -76,22 +87,53 @@ RenderTexture2D renderTexture;
 Camera2D cam;
 float scalingFactor;
 int renderTextureOffset;
+float screenShakeAmmount = 0.0f;
+int fTimer = 0;
+
+//------------------------------------------------------
+// camera
+//------------------------------------------------------
+void screenShake(float ammount){
+	screenShakeAmmount += ammount;
+}
+
+void updateCamera(){
+	screenShakeAmmount = fmin(screenShakeAmmount, 10);
+	Vector2 vec = {sin(fTimer) * screenShakeAmmount, cos(fTimer) * screenShakeAmmount};
+	cam.target = vec;
+
+	if (screenShakeAmmount < 0.1f){
+		screenShakeAmmount = 0;
+	}else {
+		screenShakeAmmount *= 0.2f;
+	}
+
+}
 
 //------------------------------------------------------
 // drawing
 //------------------------------------------------------
-void draw(int spriteIndex, int x, int y){	
-	Rectangle src = {(spriteIndex % loadedSheet.width) * DEFAULT_SPRITE_SIZE, (spriteIndex / loadedSheet.height) * DEFAULT_SPRITE_SIZE, DEFAULT_SPRITE_SIZE, DEFAULT_SPRITE_SIZE};
+void drawC(int spriteIndex, int x, int y, Color c){
+	Rectangle src = {(spriteIndex % loadedSheet.width) * DEFAULT_SPRITE_SIZE, floor((float)spriteIndex / (float)loadedSheet.width) *
+	DEFAULT_SPRITE_SIZE, DEFAULT_SPRITE_SIZE, DEFAULT_SPRITE_SIZE};
 	Rectangle dest = {x, y, DEFAULT_SPRITE_SIZE, DEFAULT_SPRITE_SIZE};
 	Vector2 origin = {0.0f,0.0f};
 
-	DrawTexturePro(loadedSheet.spriteSheetTexture, src, dest, origin, 0.0f, WHITE);
+	DrawTexturePro(loadedSheet.spriteSheetTexture, src, dest, origin, 0.0f, c);
 }
+
+void draw(int spriteIndex, int x, int y){	
+	drawC(spriteIndex, x, y, WHITE);
+}
+
+
 
 
 void fDrawBegin(){
 	BeginTextureMode(renderTexture);
     BeginMode2D(cam);
+	updateCamera();
+	fTimer++;
 }
 
 void fDrawEnd(){
@@ -108,6 +150,12 @@ void fDrawEnd(){
     EndDrawing();
 }
 
+void drawFancyText(const char* text, int x, int y, int scale, Color color){
+	int shadowOffset = fmax(scale / 10.0f, 1);
+	DrawText(text, x + shadowOffset, y, scale, GRAY);
+	DrawText(text, x, y, scale, color);
+
+}
 
 //------------------------------------------------------
 // init
