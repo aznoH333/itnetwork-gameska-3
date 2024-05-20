@@ -65,6 +65,37 @@ const int MODIFIER_OFFSET = 10;
 float worldOffset = 0.0f;
 
 //------------------------------------------------------------------------------------
+// Sounds
+//------------------------------------------------------------------------------------
+Sound breakSound;
+Sound mineSound;
+Sound oreMineSound;
+Sound jumpSound;
+Sound engineSound;
+Sound buySound;
+Music music;
+
+void loadSounds(){
+    breakSound = LoadSound("resources/break.wav");
+    mineSound = LoadSound("resources/mine.wav");
+    oreMineSound = LoadSound("resources/oreMine.wav");
+    jumpSound = LoadSound("resources/jump.wav");
+    engineSound = LoadSound("resources/engine.wav");
+    buySound = LoadSound("resources/powerUp.wav");
+    music = LoadMusicStream("resources/music.mp3");
+}
+
+void unloadSounds(){
+    UnloadSound(breakSound);
+    UnloadSound(mineSound);
+    UnloadSound(oreMineSound);
+    UnloadSound(jumpSound);
+    UnloadSound(engineSound);
+    UnloadSound(buySound);
+    UnloadMusicStream(music);
+}
+
+//------------------------------------------------------------------------------------
 // TextPopups
 //------------------------------------------------------------------------------------
 #define TEXT_POPUP_LENGTH 10
@@ -251,6 +282,14 @@ WorldTile world[WORLD_WIDTH][WORLD_HEIGHT];
 void finishedMiningTile(int x, int y);
 
 void updateWorld(){
+    if (depth < 20){
+        // draw grass
+        for (int i = 0; i < WORLD_WIDTH; i++){
+            draw(41, i * 32, 160 - worldOffset - (depth * 32));
+        }
+
+    }
+
     for (int x = 0; x < WORLD_WIDTH; x++){
         for (int y = 0; y < WORLD_HEIGHT; y++){
             WorldTile tile = world[x][y];
@@ -300,6 +339,9 @@ int getMiningTimeForTile(int x, int y){
     int out = miningTime;
 
     out += tile.sprite * 30;
+    if (tile.sprite > 2){
+        out += tile.sprite * 10;
+    }
     switch (tile.modifier){
         case MODIFIER_COAL:out += 10;break;
         case MODIFIER_SILVER:out += 30;break;
@@ -310,6 +352,9 @@ int getMiningTimeForTile(int x, int y){
         case MODIFIER_OPAL:out += 200; break;
     }
 
+    if (out < 5){
+        return 5;
+    }
     return out;
 
 }
@@ -358,6 +403,21 @@ Color getColorForTile(int x, int y){
     return out;
 }
 
+Sound getSoundForTile(int x, int y){
+
+    int cY = convertMiningY(y);
+
+    WorldTile tile = world[x][cY];
+
+    if (tile.modifier != MODIFIER_NONE && tile.modifier != MODIFIER_SPIKES && GetRandomValue(0, 9) > 4){
+        return oreMineSound;
+
+    }else {
+        return mineSound;
+
+    }
+}
+
 bool canMoveToWH(float x, float y, float w, float h){
     if (x < 0 || x  + w > 640){
         return false;
@@ -390,6 +450,7 @@ void mineTile(int x, int y){
         if (gameTimer % 3 == 0){
             Color c = getColorForTile(x, y);
             addParticle(x * 32, y * 32, c);
+            PlaySound(getSoundForTile(x, y));
         }
     }else {
         miningX = x;
@@ -453,15 +514,15 @@ WorldTile generateTile(int tileDepth){
                 if (rng < min(45, (float)tileDepth / 10 + ((sin(tileDepth * DEG2RAD) * 0.5f + 0.5f) * 30.0f))){
                     output.modifier++;
                 }
-                rng = GetRandomValue(0, 100);
-                if (rng > 95 && tileDepth > 150){
+                rng = GetRandomValue(0, 20);
+                if (rng > 10 && tileDepth > 150){
                     output.modifier++;
                 }
                 if (tileDepth > 250){
                     output.modifier++;
                 }
-                rng = GetRandomValue(0, 100);
-                if (tileDepth > 350 && rng > 65){
+                rng = GetRandomValue(0, 10);
+                if (tileDepth > 350 && rng > 6){
                     output.modifier++;
                 }
                 if (tileDepth > 650){
@@ -568,10 +629,12 @@ void playerAlive(bool isOnGround, float convY){
         player.direction = DIRECTION_LEFT;
         player.fuel -= 0.01f;
 
+
     }else if (IsKeyDown(KEY_D) && player.velocityX < 2.5f){
         player.velocityX += 0.1f;
         player.direction = DIRECTION_RIGHT;
         player.fuel -= 0.01f;
+
 
     }else if (IsKeyDown(KEY_S)){
         player.direction = DIRECTION_DOWN;
@@ -591,6 +654,7 @@ void playerAlive(bool isOnGround, float convY){
 
     if (IsKeyPressed(KEY_W) && isOnGround){
         player.velocityY -= 2.5f;
+        PlaySound(jumpSound);
     }
 
     // shop
@@ -658,6 +722,7 @@ void updatePlayer(){
 }
 
 void finishedMiningTile(int x, int y){
+    PlaySound(breakSound);
     int cY = convertMiningY(y);
     char str[TEXT_POPUP_LENGTH];
 
@@ -718,6 +783,7 @@ void activateSlot(){
         }
         player.money -= calculatePrice(selectedShopSlot);
         itemLevels[selectedShopSlot]++;
+        PlaySound(buySound);
     }
 
 
@@ -786,10 +852,14 @@ void reset(){
 //------------------------------------------------------------------------------------
 int main(void)
 {
+
     initFramework();
+    InitAudioDevice();
+    loadSounds();
 
     const Color BACKGROUND_COLOR = {51, 136, 222, 255};
     reset();
+    PlayMusicStream(music);
 
     // Main game loop
     while (!WindowShouldClose())
@@ -797,7 +867,7 @@ int main(void)
         gameTimer++;
         
         fDrawBegin();
-
+            UpdateMusicStream(music);
             ClearBackground(BACKGROUND_COLOR);
             updateWorld();
             updateShop();
@@ -810,7 +880,7 @@ int main(void)
     }
 
 	disposeFramework();
-    
+    unloadSounds();
 
     return 0;
 }
